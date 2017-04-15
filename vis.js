@@ -4,7 +4,7 @@
 $(function() {
   $.get("res/fileName.csv")
    .done(function (csvData) {
-     var data = d3.parseCsv(csvData);
+     var data = d3.csvParse(csvData);
      visualize(data);
    })
   .fail(function(e) {
@@ -29,8 +29,6 @@ var visualize = function(data) {
               .style("height", height + margin.top + margin.bottom)
               .append("g")
               .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-
 
   // == Your code! :) ==
 
