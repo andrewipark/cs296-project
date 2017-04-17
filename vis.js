@@ -14,12 +14,20 @@ $(function() {
 
 /* Visualize the data in the visualize function */
 var visualize = function(data) {
-// 	console.log(data); // plz
-
+// 	console.log(data);
+	
+ 	data = data.filter(function(d) {
+			return d["Fall"] == 2015; // probably want to change this at some point
+			/*
+			Don't use triple equals here, because we don't import the year as a number
+			also, "Fall" => "year", but the CSV is formatted oddly.
+			 */
+		})
+	
 	// == BOILERPLATE ==
 	var margin = { top: 50, right: 50, bottom: 50, left: 50 },
 		width = 800 - margin.left - margin.right,
-		height = (data.length * 20);
+		height = (data.length * 10); // TODO fix
 
 	var svg = d3.select("#chart")
 				.append("svg")
@@ -35,11 +43,15 @@ var visualize = function(data) {
 		has multiple of the same major. They need to be combined (using pandas? idk)
 		so that there is only one circle per major (not forgetting to add together
 		the values of all the duplicate rows). That way there will only be one
-		circle per major.
-
-		Also, they need to be sorted for year (2015 vs. 2005)
+		circle per major. -- I think someone was working on this
 	*/
 
+	var padding = 2, // separation between same-color nodes
+		clusterPadding = 4; // separation between different-color nodes
+	
+	// https://bl.ocks.org/mbostock/7881887
+	// or just google d3 clustered force layout
+	
 	// Haven't done anything with the majors and colleges vars yet.
 	// I think they'll come in handy sometime. -Jeannelle
 	var majors = _.map(data, "Major Code");
@@ -48,13 +60,22 @@ var visualize = function(data) {
 	var colleges = _.map(data, "College");
 	colleges = _.uniq(colleges);
 
-	// This is just a silly thing I used to set the y value while testing the colors
+	// test variable to allow us to ttach stuff to the bottom
 	var yValue = 10;
-
-		var color = d3.scaleOrdinal(d3.schemeCategory20);
+	
+	
+	// tooltip code for ease of use
+	var tip = d3.tip()
+			.attr('class', 'd3-tip')
+			.html(function(d) {
+				return d["Fall"] + " - " + d["Major Name"];
+			});
+	svg.call(tip)
+	
+	// color scale??? can we reconcile it with the below?
+	var color = d3.scaleOrdinal(d3.schemeCategory20);
 		
-		
-	// Colors the circles differently for every college. The colors are arbitrary.
+	// The colors are arbitrary.
 	var collegeColor = function(college){
 		if(college=="KP "){ //ENG
 		return "rgb(255, 127, 0)";
@@ -91,29 +112,24 @@ var visualize = function(data) {
 		return "black"
 		}
 	}
-
+	
+	// ACTUAL CODE THAT DOES STUFF WOW
 	svg.selectAll("circles")
 		.data(data)
 		.enter()
 		// everything below enter loops through once for every piece of data
-		.filter(function(d) {
-			return d["Fall"] == 2015; // probably want to change this at some point
-			/*
-			Don't use triple equals here, because we don't import the year as a number
-			also, "Fall" => "year", but the CSV is formatted oddly.
-			 */
-		})
 		.append("circle")
 		.attr("r", 5)
 		.attr("cx", 10)
-		// This function is temporary; I jsut used it to spread out the circles so
-		// I could see them while testing the colors
+		// temporary function
 		.attr("cy", function(){
 			var ret = yValue;
 			yValue += 10;
 			return ret;
 		})
 		.attr("fill", function(d){
-			return color(d["College"]); // this can be redefined to the list above later, but let's use D3 mechs
+			return color(d["College"]); // how do you do custom D3 color scales!??
 		})
-	};
+		.on("mouseover", tip.show)
+		.on('mouseout', tip.hide)
+};
