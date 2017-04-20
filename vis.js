@@ -28,7 +28,7 @@ var visualize = function (data) {
 
 	// == BOILERPLATE ==
 	var margin = { top: 50, right: 50, bottom: 50, left: 50 },
-		width = 800 - margin.left - margin.right,
+		width = 1000 - margin.left - margin.right,
 		height = 800 - margin.top - margin.bottom; // TODO fix
 
 	var svg = d3.select("#chart")
@@ -109,13 +109,18 @@ var visualize = function (data) {
 		.on("mouseover", tip.show)
 		.on('mouseout', tip.hide);
 	
+	function layoutTick (e) {
+		node
+			.attr('cx', function (d) { return d.x; })
+			.attr('cy', function (d) { return d.y; })
+	} 
 	
 	var simulation = d3.forceSimulation(nodes)
-		//.velocityDecay(0.2)
-		//.force("center", d3.forceCenter(width / 2, height / 2))
-		.force("collide", d3.forceCollide().radius(function(d) { return maxRadius + 2; }).iterations(3))
+		.velocityDecay(0.2)
+		.force("center", d3.forceCenter(width / 2, height / 2))
+		.force("collide", d3.forceCollide().radius(function(d) { return d.radius + 2; }).iterations(3))
 		//.force("cluster", clustering)
-		//.on("tick", ticked);
+		.on("tick", layoutTick);
 
 	
 
