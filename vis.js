@@ -1,10 +1,12 @@
 "use strict";
 
+var data;
+
 /* Boilerplate jQuery */
 $(function () {
 	$.get("res/uiuc_demographics_2005_15.csv")
 		.done(function (csvData) {
-			var data = d3.csvParse(csvData);
+			data = d3.csvParse(csvData);
 			visualize(data);
 		})
 		.fail(function (e) {
@@ -82,15 +84,15 @@ var visualize = function (data) {
 		
 		d.cluster = i;
 		d.radius = r;
-		d.x = Math.cos(i / colleges.length * 2 * Math.PI) * 200 + width / 2 + Math.random();
-		d.y = Math.sin(i / colleges.length * 2 * Math.PI) * 200 + height / 2 + Math.random();
+		
+		var dist = Math.random() ** 2 * 300;
+		d.x = Math.cos((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + width / 2 + Math.random();
+		d.y = Math.sin((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + height / 2 + Math.random();
 		
 		if (!clusters[i] || (r > clusters[i].radius)) clusters[i] = d;
 		if (maxRadius < d.radius) maxRadius = d.radius;
 		return d;
 	});
-	
-	console.log(nodes[0].x);
 	
 	//Fills color, enables hover
 	var node = svg.selectAll('circle')
@@ -102,77 +104,18 @@ var visualize = function (data) {
 		.attr("r", function (d) {
 			return d.radius;
 		})
-		.attr("cx", 0)
-		.attr("cy", 0)
+		.attr("cx", (d) => d.x)
+		.attr("cy", (d) => d.y)
 		.on("mouseover", tip.show)
 		.on('mouseout', tip.hide);
 	
-	function ticked() {
-			node
-					.attr('cx', (d) => d.x)
-					.attr('cy', (d) => d.y);
-	}   
-
-	// These are implementations of the custom forces.
-	function clustering(alpha) {
-			nodes.forEach(function(d) {
-				var cluster = clusters[d.cluster];
-				if (cluster === d) return;
-				var x = d.x - cluster.x,
-						y = d.y - cluster.y,
-						l = Math.sqrt(x * x + y * y),
-						r = d.r + cluster.r;
-				if (l !== r) {
-					l = (l - r) / l * alpha;
-					d.x -= x *= l;
-					d.y -= y *= l;
-					cluster.x += x;
-					cluster.y += y;
-				}  
-			});
-	}
-
-	function collide(alpha) {
-		var quadtree = d3.quadtree()
-				.x((d) => d.x)
-				.y((d) => d.y)
-				.addAll(nodes);
-
-		nodes.forEach(function(d) {
-			var r = d.r + maxRadius + Math.max(padding, clusterPadding),
-					nx1 = d.x - r,
-					nx2 = d.x + r,
-					ny1 = d.y - r,
-					ny2 = d.y + r;
-			quadtree.visit(function(quad, x1, y1, x2, y2) {
-
-				if (quad.data && (quad.data !== d)) {
-					var x = d.x - quad.data.x,
-							y = d.y - quad.data.y,
-							l = Math.sqrt(x * x + y * y),
-							r = d.r + quad.data.r + (d.cluster === quad.data.cluster ? padding : clusterPadding);
-					if (l < r) {
-						l = (l - r) / l * alpha;
-						d.x -= x *= l;
-						d.y -= y *= l;
-						quad.data.x += x;
-						quad.data.y += y;
-					}
-				}
-				return x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1;
-			});
-		});
-	}
-	
-	var f = d3.forceCenter(width / 2, height / 2);
 	
 	var simulation = d3.forceSimulation(nodes)
-		.velocityDecay(0.2)
-		.force("x", f)
-		.force("y", f)
-		.force("collide", collide) //d3.forceCollide().radius(function(d) { return d.r + 2; }).iterations(3))
-		.force("cluster", clustering)
-		.on("tick", ticked);
+		//.velocityDecay(0.2)
+		//.force("center", d3.forceCenter(width / 2, height / 2))
+		.force("collide", d3.forceCollide().radius(function(d) { return maxRadius + 2; }).iterations(3))
+		//.force("cluster", clustering)
+		//.on("tick", ticked);
 
 	
 
