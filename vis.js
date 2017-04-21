@@ -1,6 +1,4 @@
-"use strict";
 
-var data;
 
 /* Boilerplate jQuery */
 $(function () {
@@ -28,7 +26,7 @@ var visualize = function (data) {
 
 	// == BOILERPLATE ==
 	var margin = { top: 50, right: 50, bottom: 50, left: 50 },
-		width = 800 - margin.left - margin.right,
+		width = 1000 - margin.left - margin.right,
 		height = 800 - margin.top - margin.bottom; // TODO fix
 
 	var svg = d3.select("#chart")
@@ -74,26 +72,67 @@ var visualize = function (data) {
 	// color scale??? can we reconcile it with the below?
 	var color = d3.scaleOrdinal(d3.schemeCategory20);
 
-	var clusters = new Array(colleges.length)
+	var clusters = new Array(colleges.length);
+  for(var i=0; i<clusters.length; i++){
+      var j = 0;
+      for(;j<data.length; j++){
+          if(data[j]["College"] == colleges[i]){
+              break;
+          }
+      }
+      if(j<data.length-1)
+      clusters[i] = data[j]["Major Code"];
+  }
+  var xValues = new Array(colleges.length);
+  var yValues = new Array(colleges.length);
+  var radii = new Array(colleges.length);
+	for(var i=0; i<colleges.length; i++){
+		xValues[i] = 0;
+		yValues[i] = 0;
+		radii[i] = 0;
+	}
+
 	var maxRadius = 0;
-	
+
 	// generate nodes
 	var nodes = data.map(function(d) {
 		var i = colleges.indexOf(d["College"]),
 			r = parseInt(d["Total"]) ** 0.3 * 2.5 + 1;
-		
+
 		d.cluster = i;
 		d.radius = r;
-		
+
 		var dist = Math.random() ** 2 * 300;
 		d.x = Math.cos((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + width / 2 + Math.random();
 		d.y = Math.sin((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + height / 2 + Math.random();
-		
-		if (!clusters[i] || (r > clusters[i].radius)) clusters[i] = d;
+
+    if(clusters[i] == d["Major Code"]){
+        xValues[i] = d.x;
+    }
+    if(clusters[i] == d["Major Code"]){
+        yValues[i] = d.y;
+    }
+    if(clusters[i] == d["Major Code"]){
+        radii[i] = d.radius;
+    }
+
+    var cluster = clusters[d.cluster];
+    var x = d.x - xValues[i],
+        y = d.y - yValues[i],
+        l = Math.sqrt(x * x + y * y),
+        r = d.radius + radii[i];
+      l = (l - r) / (l);
+      d.x -= x *= l;
+      d.y -= y *= l;
+      xValues[i] += x;
+      yValues[i] += y;
+
+
+		if (!clusters[i] || (r > radii[i])) clusters[i] == d["Major Code"];
 		if (maxRadius < d.radius) maxRadius = d.radius;
 		return d;
 	});
-	
+
 	//Fills color, enables hover
 	var node = svg.selectAll('circle')
 		.data(nodes)
@@ -104,19 +143,22 @@ var visualize = function (data) {
 		.attr("r", function (d) {
 			return d.radius;
 		})
-		.attr("cx", (d) => d.x)
-		.attr("cy", (d) => d.y)
 		.on("mouseover", tip.show)
 		.on('mouseout', tip.hide);
-	
-	
-	var simulation = d3.forceSimulation(nodes)
-		//.velocityDecay(0.2)
-		//.force("center", d3.forceCenter(width / 2, height / 2))
-		.force("collide", d3.forceCollide().radius(function(d) { return maxRadius + 2; }).iterations(3))
-		//.force("cluster", clustering)
-		//.on("tick", ticked);
 
-	
+	function layoutTick (e) {
+		node
+			.attr('cx', function (d) { return d.x; })
+			.attr('cy', function (d) { return d.y; })
+	}
+
+	var simulation = d3.forceSimulation(nodes)
+		.velocityDecay(0.2)
+		.force("center", d3.forceCenter(width / 2, height / 2))
+		.force("collide", d3.forceCollide().radius(function(d) { return d.radius + 1; }).iterations(1))
+		//.force("cluster", clustering)
+		.on("tick", layoutTick);
+
+
 
 };
