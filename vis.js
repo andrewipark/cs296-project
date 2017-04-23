@@ -1,5 +1,9 @@
 "use strict";
 
+/*
+in real life this is a bad idea. but we're kinda limited here, because otherwise
+this seems to produce a lot of scoping errors that show up as "unexpected NaN"
+*/
 var data;
 
 /* Boilerplate jQuery */
@@ -67,12 +71,12 @@ var visualize = function (data) {
 	var tip = d3.tip()
 		.attr('class', 'd3-tip')
 		.html(function (d) {
-			return d["Fall"] + " - " + d["Major Name"];
+			return d["Fall"] + " - " + d["College"] + "/" + d["Major Name"];
 		});
 	svg.call(tip)
 
 	// color scale??? can we reconcile it with the below?
-	var color = d3.scaleOrdinal(d3.schemeCategory20);
+	var color = d3.scaleSequential(d3.interpolateRainbow);
 
 	var clusters = new Array(colleges.length)
 	var maxRadius = 0;
@@ -80,12 +84,13 @@ var visualize = function (data) {
 	// generate nodes
 	var nodes = data.map(function(d) {
 		var i = colleges.indexOf(d["College"]),
-			r = parseInt(d["Total"]) ** 0.3 * 2.5 + 1;
+			r = parseInt(d["Total"]) ** 0.5 * 0.8 + 1;
 		
-		d.cluster = i;
+		d.cluster = i * 1.0 / clusters.length;
 		d.radius = r;
 		
-		var dist = Math.random() ** 2 * 300;
+		var dist = Math.random() ** 2 * 150 + Math.max((8 - r) * 50, 0);
+		// spread out smaller ones to the outer edge
 		d.x = Math.cos((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + width / 2 + Math.random();
 		d.y = Math.sin((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + height / 2 + Math.random();
 		
@@ -94,20 +99,35 @@ var visualize = function (data) {
 		return d;
 	});
 	
-	//Fills color, enables hover
 	var node = svg.selectAll('circle')
 		.data(nodes)
 		.enter().append('circle')
-		.attr("fill", function (d) {
-			return color(d.cluster); // how do you do custom D3 color scales!??
+		// styling
+		.style("fill", function (d) {
+			return color(d.cluster);
 		})
+		.style("stroke", function (d) {
+			return d3.color(color(d.cluster)).darker(1.5);
+		})
+		.style("stroke-width", 1)
+		// positioning
 		.attr("r", function (d) {
-			return d.radius;
+			return 0; // d.radius;
 		})
 		.attr("cx", (d) => d.x)
 		.attr("cy", (d) => d.y)
+		// tooltip
 		.on("mouseover", tip.show)
 		.on('mouseout', tip.hide);
+	
+	// more gradual
+	node.transition()
+		.duration(1000)
+		.delay(function(d, i) { return i * 10; })
+		.attrTween("r", function(d) {
+		var i = d3.interpolate(0, d.radius);
+		return function(t) { return d.radius = i(t); };
+		});
 	
 	function layoutTick (e) {
 		node
@@ -115,11 +135,14 @@ var visualize = function (data) {
 			.attr('cy', function (d) { return d.y; })
 	} 
 	
+	// the strength parameters might need some tuning
+	
 	var simulation = d3.forceSimulation(nodes)
-		.velocityDecay(0.2)
+		.alphaDecay(0.001)
+// 		.velocityDecay(0.2)
+		.force("gravity", d3.forceManyBody().strength(1.2))
 		.force("center", d3.forceCenter(width / 2, height / 2))
-		.force("collide", d3.forceCollide().radius(function(d) { return d.radius + 2; }).iterations(3))
-		//.force("cluster", clustering)
+		.force("collide", d3.forceCollide().radius(function(d) { return d.radius + 1.2; }).iterations(4))
 		.on("tick", layoutTick);
 
 	
