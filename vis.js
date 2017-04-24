@@ -185,11 +185,5 @@ var visualize = function (data) {
 		});
 	
 	
-	
-	// the strength parameters might need some tuning
-	
-	
-
-	
 
 };
