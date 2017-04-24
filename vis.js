@@ -32,9 +32,10 @@ var visualize = function (data) {
 
 	// == BOILERPLATE ==
 	var margin = { top: 50, right: 50, bottom: 50, left: 50 },
-		width = 1000 - margin.left - margin.right,
-		height = 800 - margin.top - margin.bottom; // TODO fix
-
+		width = 1190 - margin.left - margin.right,
+		height = 700 - margin.top - margin.bottom;
+	// designed for 1920x1080...
+	
 	var svg = d3.select("#chart")
 		.append("svg")
 		.attr("width", width + margin.left + margin.right)
@@ -44,8 +45,7 @@ var visualize = function (data) {
 		.append("g")
 		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-	var padding = 1.2, // separation between same-color nodes
-		clusterPadding = 4; // separation between different-color nodes
+	var padding = 1.2;
 	
 	/*
 	https://bl.ocks.org/mbostock/7881887
@@ -65,7 +65,23 @@ var visualize = function (data) {
 	var tip = d3.tip()
 		.attr('class', 'd3-tip')
 		.html(function (d) {
-			return d["Fall"] + " - " + d["College"] + "/" + d["Major Name"];
+			var major = d["Major Name"];
+			var data = d["Fall"] + " - " + d["College"] + "/" + major + "<br />";
+			
+			// plurals are important
+			var students = parseInt(d["Total"]);
+			if (students == 1)
+				data += "Only one student"; // how lonely
+			else
+				data += students + " students";
+			
+			// just for fun
+			if (_.includes(major, "Computer Science"))
+				data += " who can make more visualizations like this!";
+			else if (_.includes(major, "Crop Science"))
+				data += " in the <em>other</em> CS";
+			
+			return data;
 		});
 	svg.call(tip)
 
@@ -146,33 +162,34 @@ var visualize = function (data) {
 	
 	// The clustering currently works ok, but causes LAS to screw around and start doing backflips.
 	// strength parameters need tuning
-var simulation = d3.forceSimulation()
-  // keep entire simulation balanced around screen center
-  .force('center', d3.forceCenter(width/2, height/2))
+	var simulation = d3.forceSimulation()
+		// keep entire simulation balanced around screen center
+		.force('center', d3.forceCenter(width/2, height/2))
+		
+		.force("gravity", d3.forceManyBody().strength(1))
+		
+		// this one is not strictly necessary?
+		.force('attract', d3.forceAttract()
+			.target([width/2, height/2])
+			.strength(0.01))
+		
+		.force('cluster', d3.forceCluster()
+			.centers(function (d) { return clusters[d.cluster]; })
+			.strength(0.5)
+			.centerInertia(0.1))
 
-  .force('attract', d3.forceAttract()
-    .target([width/2, height/2])
-    .strength(0.01))
-	
-  .force('cluster', d3.forceCluster()
-    .centers(function (d) { return clusters[d.cluster]; })
-    .strength(0.5)
-    .centerInertia(0.1))
+		// apply collision with padding
+		.force('collide', d3.forceCollide(function (d) { return d.radius + padding; })
+			.strength(0))
 
-  // apply collision with padding
-  // apply collision with padding
-  .force('collide', d3.forceCollide(function (d) { return d.radius + padding; })
-    .strength(0))
+		.on('tick', layoutTick)
+		.nodes(nodes);
 
-  .on('tick', layoutTick)
-  .nodes(nodes);
-
-function layoutTick (e) {
-  node
-    .attr('cx', function (d) { return d.x; })
-    .attr('cy', function (d) { return d.y; })
-    .attr('r', function (d) { return d.radius; });
-}
+	function layoutTick (e) {
+		node
+			.attr('cx', function (d) { return d.x; })
+			.attr('cy', function (d) { return d.y; })
+	}
 	
 	// ramp up collision strength to provide smooth transition
 	var transitionTime = 2000;
@@ -182,7 +199,15 @@ function layoutTick (e) {
 		simulation.force('collide').strength(Math.pow(dt, 2) * 1);
 		if (dt >= 1.0) t.stop();
 	});
-		
+	
+	// transition radii
+	node.transition()
+		.duration(transitionTime / 2)
+		.delay(function(d, i) { return i * 9; })
+		.attrTween("r", function(d) {
+			var i = d3.interpolate(0, d.radius);
+			return function(t) { return d.radius = i(t); };
+	});
 	
 	
 
