@@ -44,23 +44,17 @@ var visualize = function (data) {
 		.append("g")
 		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-	/*
-		The data right now has a circle for every single line on the CSV, which
-		has multiple of the same major. They need to be combined (using pandas? idk)
-		so that there is only one circle per major (not forgetting to add together
-		the values of all the duplicate rows). That way there will only be one
-		circle per major. -- I think someone was working on this
-	*/
-
-	var padding = 2, // separation between same-color nodes
+	var padding = 1.2, // separation between same-color nodes
 		clusterPadding = 4; // separation between different-color nodes
-
-	// https://bl.ocks.org/mbostock/7881887
-	// https://bl.ocks.org/shancarter/f621ac5d93498aa1223d8d20e5d3a0f4
-	// or just google d3 clustered force layout
-
-	// Haven't done anything with the majors and colleges vars yet.
-	// I think they'll come in handy sometime. -Jeannelle
+	
+	/*
+	https://bl.ocks.org/mbostock/7881887
+	https://bl.ocks.org/shancarter/f621ac5d93498aa1223d8d20e5d3a0f4
+	https://bl.ocks.org/ericsoco/d2d49d95d2f75552ac64f0125440b35e
+	or just google d3 clustered force layout
+	*/
+	
+	// this one is unused
 	var majors = _.map(data, "Major Code");
 	majors = _.uniq(majors);
 
@@ -86,10 +80,12 @@ var visualize = function (data) {
 		var i = colleges.indexOf(d["College"]),
 			r = parseInt(d["Total"]) ** 0.5 * 0.8 + 1;
 		
-		d.cluster = i * 1.0 / clusters.length;
+		d.cluster = i;
 		d.radius = r;
+		d.r = r + padding; // for circle packing
 		
-		var dist = Math.random() ** 2 * 150 + Math.max((8 - r) * 50, 0);
+		// numbers subject to change
+		var dist = Math.random() ** 2 * 150 + Math.max((8 - r) * 60, 0);
 		// spread out smaller ones to the outer edge
 		d.x = Math.cos((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + width / 2 + Math.random();
 		d.y = Math.sin((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + height / 2 + Math.random();
@@ -99,15 +95,18 @@ var visualize = function (data) {
 		return d;
 	});
 	
+	// HIGHLY DANGEROUS MAGIC
+	// d3.packSiblings(nodes);
+	
 	var node = svg.selectAll('circle')
 		.data(nodes)
 		.enter().append('circle')
 		// styling
 		.style("fill", function (d) {
-			return color(d.cluster);
+			return color(d.cluster * 1.0 / clusters.length);
 		})
 		.style("stroke", function (d) {
-			return d3.color(color(d.cluster)).darker(1.5);
+			return d3.color(color(d.cluster)).darker(0.5);
 		})
 		.style("stroke-width", 1)
 		// positioning
@@ -119,44 +118,47 @@ var visualize = function (data) {
 		// tooltip
 		.on("mouseover", tip.show)
 		.on('mouseout', tip.hide)
-		    .call(d3.drag()
-      .on('start', dragstarted)
-      .on('drag', dragged)
-      .on('end', dragended)
-    );
-	function dragstarted (d) {
-  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
-  d.fx = d.x;
-  d.fy = d.y;
-}
-
-function dragged (d) {
-  d.fx = d3.event.x;
-  d.fy = d3.event.y;
-}
-
-function dragended (d) {
-  if (!d3.event.active) simulation.alphaTarget(0);
-  d.fx = null;
-  d.fy = null;
-}
-
-// ramp up collision strength to provide smooth transition
-var transitionTime = 3000;
-var t = d3.timer(function (elapsed) {
-  var dt = elapsed / transitionTime;
-  simulation.force('collide').strength(Math.pow(dt, 2) * 0.7);
-  if (dt >= 1.0) t.stop();
-});
+		// drag behavior
+		.call(d3.drag()
+			.on('start', dragstarted)
+			.on('drag', dragged)
+			.on('end', dragended)
+		);
 	
-	// more gradual
-	node.transition()
-		.duration(1000)
-		.delay(function(d, i) { return i * 10; })
-		.attrTween("r", function(d) {
-		var i = d3.interpolate(0, d.radius);
-		return function(t) { return d.radius = i(t); };
-		});
+		
+	// drag behavior implementation
+	function dragstarted (d) {
+		if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+		d.fx = d.x;
+		d.fy = d.y;
+	}
+
+	function dragged (d) {
+		d.fx = d3.event.x;
+		d.fy = d3.event.y;
+	}
+
+	function dragended (d) {
+		if (!d3.event.active) simulation.alphaTarget(0);
+		d.fx = null;
+		d.fy = null;
+	}
+	
+	// The clustering currently works ok, but causes LAS to screw around and start doing backflips.
+	// strength parameters need tuning
+	var simulation = d3.forceSimulation(nodes)
+		.alphaDecay(0.001)
+// 		.velocityDecay(0.2)
+		.force("gravity", d3.forceManyBody().strength(1))
+		.force("center", d3.forceCenter(width / 2, height / 2))
+// 		/*
+		.force('cluster', d3.forceCluster()
+			.centers(function (d) { return clusters[d.cluster]; })
+			.strength(1)
+			.centerInertia(0.1))
+// 		*/
+		.force("collide", d3.forceCollide().radius(function(d) { return d.radius + padding; }).iterations(4))
+		.on("tick", layoutTick);
 	
 	function layoutTick (e) {
 		node
@@ -164,24 +166,29 @@ var t = d3.timer(function (elapsed) {
 			.attr('cy', function (d) { return d.y; })
 	} 
 	
+	// ramp up collision strength to provide smooth transition
+	var transitionTime = 2000;
+	
+	var t = d3.timer(function (elapsed) {
+		var dt = elapsed / transitionTime;
+		simulation.force('collide').strength(Math.pow(dt, 2) * 1);
+		if (dt >= 1.0) t.stop();
+	});
+		
+	// transition circles into appearance
+	node.transition()
+		.duration(transitionTime / 2)
+		.delay(function(d, i) { return i * 9; })
+		.attrTween("r", function(d) {
+			var i = d3.interpolate(0, d.radius);
+			return function(t) { return d.radius = i(t); };
+		});
+	
+	
+	
 	// the strength parameters might need some tuning
 	
-	var simulation = d3.forceSimulation(nodes)
-		.alphaDecay(0.001)
-// 		.velocityDecay(0.2)
-		.force("gravity", d3.forceManyBody().strength(1.2))
-		.force("center", d3.forceCenter(width / 2, height / 2))
-
-		// cluster 
-		.force('cluster', d3.forceCluster()
-			.centers(function (d) { return clusters[d.cluster]; })
-			.strength(0.5)
-			.centerInertia(0.1))
-			
-		// apply collision
-		.force('collide', d3.forceCollide(function (d) { return d.radius + 5; })
-			.strength(0))
-		.on("tick", layoutTick);
+	
 
 	
 
