@@ -146,25 +146,33 @@ var visualize = function (data) {
 	
 	// The clustering currently works ok, but causes LAS to screw around and start doing backflips.
 	// strength parameters need tuning
-	var simulation = d3.forceSimulation(nodes)
-		.alphaDecay(0.001)
-// 		.velocityDecay(0.2)
-		.force("gravity", d3.forceManyBody().strength(1))
-		.force("center", d3.forceCenter(width / 2, height / 2))
-// 		/*
-		.force('cluster', d3.forceCluster()
-			.centers(function (d) { return clusters[d.cluster]; })
-			.strength(1)
-			.centerInertia(0.1))
-// 		*/
-		.force("collide", d3.forceCollide().radius(function(d) { return d.radius + padding; }).iterations(4))
-		.on("tick", layoutTick);
+var simulation = d3.forceSimulation()
+  // keep entire simulation balanced around screen center
+  .force('center', d3.forceCenter(width/2, height/2))
+
+  .force('attract', d3.forceAttract()
+    .target([width/2, height/2])
+    .strength(0.01))
 	
-	function layoutTick (e) {
-		node
-			.attr('cx', function (d) { return d.x; })
-			.attr('cy', function (d) { return d.y; })
-	} 
+  .force('cluster', d3.forceCluster()
+    .centers(function (d) { return clusters[d.cluster]; })
+    .strength(0.5)
+    .centerInertia(0.1))
+
+  // apply collision with padding
+  // apply collision with padding
+  .force('collide', d3.forceCollide(function (d) { return d.radius + padding; })
+    .strength(0))
+
+  .on('tick', layoutTick)
+  .nodes(nodes);
+
+function layoutTick (e) {
+  node
+    .attr('cx', function (d) { return d.x; })
+    .attr('cy', function (d) { return d.y; })
+    .attr('r', function (d) { return d.radius; });
+}
 	
 	// ramp up collision strength to provide smooth transition
 	var transitionTime = 2000;
@@ -175,14 +183,6 @@ var visualize = function (data) {
 		if (dt >= 1.0) t.stop();
 	});
 		
-	// transition circles into appearance
-	node.transition()
-		.duration(transitionTime / 2)
-		.delay(function(d, i) { return i * 9; })
-		.attrTween("r", function(d) {
-			var i = d3.interpolate(0, d.radius);
-			return function(t) { return d.radius = i(t); };
-		});
 	
 	
 
