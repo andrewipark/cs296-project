@@ -30,18 +30,37 @@ var visualize = function (data) {
 		 */
 	});
 
-	// == BOILERPLATE ==
-	var margin = { top: 50, right: 50, bottom: 50, left: 50 },
-		width = 1190 - margin.left - margin.right,
-		height = 700 - margin.top - margin.bottom;
-	// designed for 1920x1080...
+	// REALLY, REALLY BAD WAY TO CHECK FOR MOBILE DEVICES
+	var isPhone = (window.innerHeight > 1.3 * window.innerWidth);
 	
+	var width_d = 1000, height_d = 600;
+	// the nominal "full size" and aspect ratio.
+	// all pixel values are relative to this.
+	if (isPhone) {
+		console.log("phone");
+		width_d = 600;
+		height_d = 800;
+		// shrink b/c mobile devices are tiny...
+	}
+	
+	// == BOILERPLATE ==
+	var margin = { top: 0, right: 0, bottom: 0, left: 0 }, // just because
+		width = width_d - margin.left - margin.right,
+		height = height_d - margin.top - margin.bottom;
+	
+	// responsive code
+	// http://stackoverflow.com/questions/9400615/whats-the-best-way-to-make-a-d3-js-visualisation-layout-responsive
 	var svg = d3.select("#chart")
 		.append("svg")
+		// we can't use external CSS. no matter, just set it here.
+		.attr("preserveAspectRatio", "xMinYMin slice")
+		.attr("viewBox", "0 0 " + width_d + " " + height_d)
+		/*
 		.attr("width", width + margin.left + margin.right)
 		.attr("height", height + margin.top + margin.bottom)
 		.style("width", width + margin.left + margin.right)
 		.style("height", height + margin.top + margin.bottom)
+		*/
 		.append("g")
 		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
@@ -80,6 +99,10 @@ var visualize = function (data) {
 				data += " who can make more visualizations like this!";
 			else if (_.includes(major, "Crop Science"))
 				data += " in the <em>other</em> CS";
+			else if (_.includes(major, "Physics"))
+				data += " not put off by PHYS 212";
+			else if (_.includes(major, "Undec"))
+				data += " finding their passion";
 			
 			return data;
 		});
@@ -91,6 +114,9 @@ var visualize = function (data) {
 	var clusters = new Array(colleges.length)
 	var maxRadius = 0;
 	
+	// randomize where each college falls
+	var randArcAngle = Math.random();
+	
 	// generate nodes
 	var nodes = data.map(function(d) {
 		var i = colleges.indexOf(d["College"]),
@@ -101,18 +127,19 @@ var visualize = function (data) {
 		d.r = r + padding; // for circle packing
 		
 		// numbers subject to change
+		
 		var dist = Math.random() ** 2 * 150 + Math.max((8 - r) * 60, 0);
 		// spread out smaller ones to the outer edge
-		d.x = Math.cos((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + width / 2 + Math.random();
-		d.y = Math.sin((i + Math.random()) / colleges.length * 2 * Math.PI) * dist + height / 2 + Math.random();
+		
+		var arcangle = ((i + Math.random()) / colleges.length + randArcAngle) * 2 * Math.PI;
+		d.x = Math.cos(arcangle) * dist + width / 2 + Math.random();
+		d.y = Math.sin(arcangle) * dist * (isPhone ? 1.5 : 1) + height / 2 + Math.random();
+		// the clustering tends to skew to be wide, not tall...
 		
 		if (!clusters[i] || (r > clusters[i].radius)) clusters[i] = d;
 		if (maxRadius < d.radius) maxRadius = d.radius;
 		return d;
 	});
-	
-	// HIGHLY DANGEROUS MAGIC
-	// d3.packSiblings(nodes);
 	
 	var node = svg.selectAll('circle')
 		.data(nodes)
@@ -160,8 +187,6 @@ var visualize = function (data) {
 		d.fy = null;
 	}
 	
-	// The clustering currently works ok, but causes LAS to screw around and start doing backflips.
-	// strength parameters need tuning
 	var simulation = d3.forceSimulation()
 		// keep entire simulation balanced around screen center
 		.force('center', d3.forceCenter(width/2, height/2))
@@ -187,12 +212,13 @@ var visualize = function (data) {
 
 	function layoutTick (e) {
 		node
-			.attr('cx', function (d) { return d.x; })
-			.attr('cy', function (d) { return d.y; })
+			.attr('cx', (d) => d.x)
+			.attr('cy', (d) => d.y)
+			
 	}
 	
 	// ramp up collision strength to provide smooth transition
-	var transitionTime = 2000;
+	var transitionTime = 2500;
 	
 	var t = d3.timer(function (elapsed) {
 		var dt = elapsed / transitionTime;
@@ -200,14 +226,14 @@ var visualize = function (data) {
 		if (dt >= 1.0) t.stop();
 	});
 	
-	// transition radii
+	// make circle radius transition to complement the collision strength transition
 	node.transition()
 		.duration(transitionTime / 2)
-		.delay(function(d, i) { return i * 9; })
+		.delay(function(d, i) { return i * (transitionTime * 1.0 / data.length); })
 		.attrTween("r", function(d) {
 			var i = d3.interpolate(0, d.radius);
 			return function(t) { return d.radius = i(t); };
-	});
+		});
 	
 	
 
